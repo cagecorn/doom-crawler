@@ -1,5 +1,4 @@
 // src/engines/turnEngine.js
-import { game } from '../game.js';
 
 export class TurnEngine {
     constructor(player, monsterManager, mercenaryManager, eventManager) {
@@ -33,9 +32,9 @@ export class TurnEngine {
         if (!this.isPlayerTurn) { // 적 턴이 끝났을 때
             this.isPlayerTurn = true;
             this.turnNumber++;
-            this.eventManager.emit('turnEnd', { turnNumber: this.turnNumber });
-            this.eventManager.emit('playerTurnStart');
-            game.uiManager.addLog("Your turn.", "white");
+            this.eventManager.publish('turnEnd', { turnNumber: this.turnNumber });
+            this.eventManager.publish('playerTurnStart');
+            this.eventManager.publish('log', { message: 'Your turn.', color: 'white' });
         }
     }
 
