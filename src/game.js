@@ -583,7 +583,7 @@ export class Game {
 
         this.setupEventListeners(assets, canvas);
 
-        const gameLoop = new GameLoop(this.update, this.render);
+        const gameLoop = new GameLoop(this.update, this.draw);
         gameLoop.start();
     }
 
@@ -1219,12 +1219,12 @@ export class Game {
             ...this.monsterManager.monsters.flatMap(m => m.consumables || []),
         ];
         this.microEngine.update(allItems);
-        // ✅ 모든 엔진을 업데이트하는 브릿지 호출 (렌더링 포함)
+        // ✅ 모든 엔진을 업데이트하는 브릿지 호출
         this.engineBridge.update(this.getContext());
         eventManager.publish('debug', { tag: 'Frame', message: '--- Frame Update End ---' });
     }
 
-    render = () => {
+    draw = () => {
         const { layerManager, gameState, mapManager, itemManager, monsterManager, mercenaryManager, fogManager, uiManager } = this;
         const assets = this.loader.assets;
         const canvas = layerManager.layers.mapBase;
@@ -1269,6 +1269,16 @@ export class Game {
         }
 
         uiManager.updateUI(gameState);
+
+        const context = this.getContext();
+
+        // EngineBridge를 통해 엔진들의 draw 메서드를 호출한다.
+        this.engineBridge.draw(context);
+
+        // UI 매니저에 draw 메서드가 있다면 호출한다.
+        if (typeof this.uiManager.draw === 'function') {
+            this.uiManager.draw(context);
+        }
     }
 
     getContext() {

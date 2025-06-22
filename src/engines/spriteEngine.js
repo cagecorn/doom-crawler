@@ -6,83 +6,61 @@
  */
 export class SpriteEngine {
     constructor(layerManager) {
-        // 레이어 매니저에서 주로 사용할 캔버스를 받아옵니다.
-        this.entityLayer = layerManager.getLayer('entity');
-        this.projectileLayer = layerManager.getLayer('vfx');
-        console.log('[SpriteEngine] Initialized.');
+        this.mainLayer = layerManager.getLayer('main');
+        this.projectileLayer = layerManager.getLayer('projectile');
+        console.log("[SpriteEngine] Initialized.");
     }
 
     /**
-     * 매 프레임 호출되어 모든 월드 개체를 다시 그립니다.
-     * @param {object} context - 게임 월드 정보
+     * SpriteEngine은 프레임마다 계산할 로직이 없습니다.
+     * @param {object} context
      */
     update(context) {
-        this.draw(context);
+        // 비워 둡니다.
     }
 
+    /**
+     * 모든 개체를 캔버스에 그립니다.
+     * @param {object} context
+     */
     draw(context) {
-        const {
-            camera,
-            player,
-            monsterManager,
-            mercenaryManager,
-            petManager,
-            itemManager,
-            projectileManager,
-            fogManager
-        } = context;
+        const { camera, player, monsterManager, mercenaryManager, itemManager, projectileManager, fogManager } = context;
 
-        // === 메인 엔티티 레이어 ===
-        const mainCtx = this.entityLayer.getContext();
-        mainCtx.clearRect(0, 0, this.entityLayer.canvas.width, this.entityLayer.canvas.height);
+        // 메인 캔버스 초기화
+        const mainCtx = this.mainLayer.getContext();
+        mainCtx.clearRect(0, 0, this.mainLayer.canvas.width, this.mainLayer.canvas.height);
         mainCtx.save();
         mainCtx.translate(-camera.x, -camera.y);
 
-        // 아이템
+        // 그리기 순서: 아이템 -> 유닛 (몬스터, 용병, 플레이어)
         for (const item of itemManager.items) {
-            if (!fogManager || fogManager.isVisible(item.x, item.y)) {
-                if (typeof item.render === 'function') item.render(mainCtx);
+            if (fogManager.isVisible(item.x, item.y)) {
+                 mainCtx.drawImage(item.asset, item.x, item.y, item.width, item.height);
             }
         }
-
-        // 몬스터
-        monsterManager.monsters
-            .filter(m => !m.isHidden)
-            .forEach(m => {
-                if (!fogManager || fogManager.isVisible(m.x, m.y)) m.render(mainCtx);
-            });
-
-        // 용병
-        mercenaryManager.mercenaries
-            .filter(m => !m.isHidden)
-            .forEach(m => {
-                if (!fogManager || fogManager.isVisible(m.x, m.y)) m.render(mainCtx);
-            });
-
-        // 펫
-        if (petManager?.pets) {
-            petManager.pets
-                .filter(p => !p.isHidden)
-                .forEach(p => {
-                    if (!fogManager || fogManager.isVisible(p.x, p.y)) p.render(mainCtx);
-                });
+        for (const monster of monsterManager.monsters) {
+            if (fogManager.isVisible(monster.x, monster.y)) {
+                mainCtx.drawImage(monster.asset, monster.x, monster.y, monster.width, monster.height);
+            }
         }
-
-        // 플레이어
-        if (player && !player.isHidden) player.render(mainCtx);
-
+        for (const mercenary of mercenaryManager.mercenaries) {
+             if (fogManager.isVisible(mercenary.x, mercenary.y)) {
+                mainCtx.drawImage(mercenary.asset, mercenary.x, mercenary.y, mercenary.width, mercenary.height);
+            }
+        }
+        mainCtx.drawImage(player.asset, player.x, player.y, player.width, player.height);
         mainCtx.restore();
 
-        // === 투사체 레이어 ===
+        // 투사체 캔버스 초기화 및 그리기
         const projCtx = this.projectileLayer.getContext();
         projCtx.clearRect(0, 0, this.projectileLayer.canvas.width, this.projectileLayer.canvas.height);
         projCtx.save();
         projCtx.translate(-camera.x, -camera.y);
 
-        if (projectileManager && typeof projectileManager.render === 'function') {
-            projectileManager.render(projCtx);
+        for (const p of projectileManager.projectiles) {
+            projCtx.fillStyle = p.color;
+            projCtx.fillRect(p.x, p.y, p.width, p.height);
         }
-
         projCtx.restore();
     }
 }
