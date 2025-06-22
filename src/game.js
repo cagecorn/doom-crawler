@@ -17,7 +17,8 @@ import { MetaAIManager, STRATEGY } from './managers/ai-managers.js';
 import { SaveLoadManager } from './managers/saveLoadManager.js';
 import { LayerManager } from './managers/layerManager.js';
 import { PathfindingManager } from './managers/pathfindingManager.js';
-import { MovementManager } from './managers/movementManager.js';
+import { EngineBridge } from './engines/EngineBridge.js';
+import { MovementEngine } from './engines/movementEngine.js';
 import { FogManager } from './managers/fogManager.js';
 import { NarrativeManager } from './managers/narrativeManager.js';
 import { TurnManager } from './managers/turnManager.js';
@@ -168,7 +169,10 @@ export class Game {
         this.itemFactory = new ItemFactory(assets);
         this.pathfindingManager = new PathfindingManager(this.mapManager);
         this.motionManager = new Managers.MotionManager(this.mapManager, this.pathfindingManager);
-        this.movementManager = new MovementManager(this.mapManager);
+        // 엔진 시스템 초기화
+        this.engineBridge = new EngineBridge();
+        this.movementEngine = new MovementEngine(this.mapManager);
+        this.engineBridge.register('movement', this.movementEngine);
         this.fogManager = new FogManager(this.mapManager.width, this.mapManager.height);
         this.particleDecoratorManager = new Managers.ParticleDecoratorManager();
         this.particleDecoratorManager.setManagers(this.vfxManager, this.mapManager);
@@ -1162,7 +1166,8 @@ export class Game {
             mercenaryManager,
             pathfindingManager,
             motionManager: this.motionManager,
-            movementManager: this.movementManager,
+            // 기존 movementManager 호환성을 위해 movementEngine을 전달
+            movementManager: this.movementEngine,
             projectileManager: this.projectileManager,
             itemManager: this.itemManager,
             equipmentManager: this.equipmentManager,
@@ -1175,6 +1180,8 @@ export class Game {
             speechBubbleManager: this.speechBubbleManager,
             enemies: metaAIManager.groups['dungeon_monsters']?.members || []
         };
+        // 등록된 엔진들 업데이트
+        this.engineBridge.update(context);
         metaAIManager.update(context);
         this.possessionAIManager.update(context);
         this.itemAIManager.update(context);
