@@ -13,7 +13,17 @@ export class AIEngine {
 
     createGroup(id, strategy = 'aggressive') {
         if (!this.groups[id]) {
-            this.groups[id] = { id, members: [], strategy };
+            this.groups[id] = {
+                id,
+                members: [],
+                strategy,
+                addMember(entity) {
+                    this.members.push(entity);
+                },
+                removeMember(entityId) {
+                    this.members = this.members.filter(m => m.id !== entityId);
+                }
+            };
         }
         return this.groups[id];
     }
