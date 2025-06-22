@@ -24,7 +24,6 @@ import { EngineBridge } from './engines/EngineBridge.js';
 import { MovementEngine } from './engines/movementEngine.js';
 import { FogManager } from './managers/fogManager.js';
 import { NarrativeManager } from './managers/narrativeManager.js';
-import { TurnManager } from './managers/turnManager.js';
 import { TurnEngine } from './engines/turnEngine.js';
 import { VFXEngine } from './engines/vfxEngine.js';
 import { SpriteEngine } from './engines/spriteEngine.js';
@@ -110,7 +109,7 @@ export class Game {
         // Player begins in the Aquarium map for feature testing
         this.mapManager = new AquariumMapManager();
         this.saveLoadManager = new SaveLoadManager();
-        // this.turnManager = new TurnManager();
+        // this.turnManager = new TurnManager(); // legacy line retained for clarity
         this.narrativeManager = new NarrativeManager();
         this.factory = new CharacterFactory(assets);
 
@@ -296,8 +295,9 @@ export class Game {
             isPaused: false
         };
         this.playerGroup.addMember(player);
-        this.turnEngine = new TurnEngine(player, this.monsterManager, this.mercenaryManager, this.eventManager);
-        this.engineBridge.register('turn', this.turnEngine);
+        // turnEngine 인스턴스를 생성하되, 기존 호환성을 위해 turnManager라는 변수명으로 유지한다
+        this.turnManager = new TurnEngine(player, this.monsterManager, this.mercenaryManager, this.eventManager);
+        this.engineBridge.register('turn', this.turnManager);
 
         // 초기 아이템 배치
         const potion = this.itemFactory.create(
@@ -1105,7 +1105,7 @@ export class Game {
         const allEntities = [gameState.player, ...mercenaryManager.mercenaries, ...monsterManager.monsters, ...(this.petManager?.pets || [])];
         gameState.player.applyRegen();
         effectManager.update(allEntities); // EffectManager 업데이트 호출
-        // this.turnEngine.update(allEntities, { eventManager, player: gameState.player, parasiteManager: this.parasiteManager });
+        // this.turnManager.update(allEntities, { eventManager, player: gameState.player, parasiteManager: this.parasiteManager });
         itemManager.update();
         this.petManager.update();
         if (this.auraManager) {
@@ -1193,7 +1193,7 @@ export class Game {
             itemManager: this.itemManager,
             equipmentManager: this.equipmentManager,
             vfxManager: this.vfxEngine,
-            turnManager: this.turnEngine,
+            turnManager: this.turnManager,
             camera: gameState.camera,
             assets: this.loader.assets,
             metaAIManager: aiEngine,
@@ -1286,7 +1286,7 @@ export class Game {
             itemManager: this.itemManager,
             equipmentManager: this.equipmentManager,
             vfxManager: this.vfxEngine,
-            turnManager: this.turnEngine,
+            turnManager: this.turnManager,
             statManager: this.statEngine,
             camera: this.gameState.camera,
             assets: this.loader.assets,
