@@ -22,6 +22,8 @@ import { MovementEngine } from './engines/movementEngine.js';
 import { FogManager } from './managers/fogManager.js';
 import { NarrativeManager } from './managers/narrativeManager.js';
 import { TurnManager } from './managers/turnManager.js';
+import { TurnEngine } from './engines/turnEngine.js';
+import { VFXEngine } from './engines/vfxEngine.js';
 import { SKILLS } from './data/skills.js';
 import { EFFECTS } from './data/effects.js';
 import { Item } from './entities.js';
@@ -103,7 +105,7 @@ export class Game {
         // Player begins in the Aquarium map for feature testing
         this.mapManager = new AquariumMapManager();
         this.saveLoadManager = new SaveLoadManager();
-        this.turnManager = new TurnManager();
+        // this.turnManager = new TurnManager();
         this.narrativeManager = new NarrativeManager();
         this.factory = new CharacterFactory(assets);
 
@@ -173,6 +175,8 @@ export class Game {
         this.engineBridge = new EngineBridge();
         this.movementEngine = new MovementEngine(this.mapManager);
         this.engineBridge.register('movement', this.movementEngine);
+        this.vfxEngine = new VFXEngine(this.layerManager);
+        this.engineBridge.register('vfx', this.vfxEngine);
         this.fogManager = new FogManager(this.mapManager.width, this.mapManager.height);
         this.particleDecoratorManager = new Managers.ParticleDecoratorManager();
         this.particleDecoratorManager.setManagers(this.vfxManager, this.mapManager);
@@ -279,6 +283,8 @@ export class Game {
             isPaused: false
         };
         this.playerGroup.addMember(player);
+        this.turnEngine = new TurnEngine(player, this.monsterManager, this.mercenaryManager, this.eventManager);
+        this.engineBridge.register('turn', this.turnEngine);
 
         // 초기 아이템 배치
         const potion = this.itemFactory.create(
@@ -1078,13 +1084,18 @@ export class Game {
     }
 
     update = (deltaTime) => {
-        const { gameState, mercenaryManager, monsterManager, itemManager, mapManager, inputHandler, effectManager, turnManager, metaAIManager, eventManager, equipmentManager, pathfindingManager, microEngine, microItemAIManager } = this;
-        if (gameState.isPaused || gameState.isGameOver) return;
+        if (this.gameState.isGameOver) return;
+
+        // ✅ 모든 엔진을 업데이트하는 브릿지 호출
+        this.engineBridge.update(this.getContext());
+
+        const { gameState, mercenaryManager, monsterManager, itemManager, mapManager, inputHandler, effectManager, metaAIManager, eventManager, equipmentManager, pathfindingManager, microEngine, microItemAIManager } = this;
+        if (gameState.isPaused) return;
 
         const allEntities = [gameState.player, ...mercenaryManager.mercenaries, ...monsterManager.monsters, ...(this.petManager?.pets || [])];
         gameState.player.applyRegen();
         effectManager.update(allEntities); // EffectManager 업데이트 호출
-        turnManager.update(allEntities, { eventManager, player: gameState.player, parasiteManager: this.parasiteManager }); // 턴 매니저 업데이트
+        // this.turnEngine.update(allEntities, { eventManager, player: gameState.player, parasiteManager: this.parasiteManager });
         itemManager.update();
         this.petManager.update();
         if (this.auraManager) {
@@ -1171,7 +1182,8 @@ export class Game {
             projectileManager: this.projectileManager,
             itemManager: this.itemManager,
             equipmentManager: this.equipmentManager,
-            vfxManager: this.vfxManager,
+            vfxManager: this.vfxEngine,
+            turnManager: this.turnEngine,
             assets: this.loader.assets,
             metaAIManager,
             microItemAIManager,
@@ -1180,13 +1192,12 @@ export class Game {
             speechBubbleManager: this.speechBubbleManager,
             enemies: metaAIManager.groups['dungeon_monsters']?.members || []
         };
-        // 등록된 엔진들 업데이트
-        this.engineBridge.update(context);
+        // 등록된 엔진들 업데이트는 상단에서 처리
         metaAIManager.update(context);
         this.possessionAIManager.update(context);
         this.itemAIManager.update(context);
         this.projectileManager.update(allEntities);
-        this.vfxManager.update();
+        // this.vfxManager.update();
         this.speechBubbleManager.update();
         // micro-world engine runs after visuals and item logic
         const allItems = [
@@ -1240,7 +1251,7 @@ export class Game {
         fogManager.render(contexts.vfx, mapManager.tileSize);
         uiManager.renderHpBars(contexts.vfx, gameState.player, monsterManager.monsters, mercenaryManager.mercenaries);
         this.projectileManager.render(contexts.vfx);
-        this.vfxManager.render(contexts.vfx);
+        // this.vfxManager.render(contexts.vfx);
         this.speechBubbleManager.render(contexts.vfx);
         this.effectIconManager.render(contexts.vfx, [gameState.player, ...monsterManager.monsters, ...mercenaryManager.mercenaries, ...this.petManager.pets], EFFECTS);
 
@@ -1251,6 +1262,32 @@ export class Game {
         }
 
         uiManager.updateUI(gameState);
+    }
+
+    getContext() {
+        const { gameState, metaAIManager } = this;
+        return {
+            eventManager: this.eventManager,
+            player: gameState.player,
+            mapManager: this.mapManager,
+            monsterManager: this.monsterManager,
+            mercenaryManager: this.mercenaryManager,
+            pathfindingManager: this.pathfindingManager,
+            motionManager: this.motionManager,
+            movementManager: this.movementEngine,
+            projectileManager: this.projectileManager,
+            itemManager: this.itemManager,
+            equipmentManager: this.equipmentManager,
+            vfxManager: this.vfxEngine,
+            turnManager: this.turnEngine,
+            assets: this.loader.assets,
+            metaAIManager,
+            microItemAIManager: this.microItemAIManager,
+            playerGroup: this.playerGroup,
+            monsterGroup: this.monsterGroup,
+            speechBubbleManager: this.speechBubbleManager,
+            enemies: metaAIManager.groups['dungeon_monsters']?.members || []
+        };
     }
 
     handleAttack(attacker, defender, skill = null) {
