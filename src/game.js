@@ -164,6 +164,7 @@ export class Game {
         this.equipmentRenderManager = this.managers.EquipmentRenderManager;
         this.mercenaryManager.equipmentRenderManager = this.equipmentRenderManager;
         // this.traitManager = this.managers.TraitManager;
+        this.engineBridge = new EngineBridge();
         this.mbtiEngine = new MBTIEngine(this.eventManager, this.uiManager);
         this.engineBridge.register('mbti', this.mbtiEngine);
         this.mercenaryManager.setTraitManager(this.mbtiEngine);
@@ -177,7 +178,6 @@ export class Game {
         this.pathfindingManager = new PathfindingManager(this.mapManager);
         this.motionManager = new Managers.MotionManager(this.mapManager, this.pathfindingManager);
         // 엔진 시스템 초기화
-        this.engineBridge = new EngineBridge();
         this.movementEngine = new MovementEngine(this.mapManager);
         this.engineBridge.register('movement', this.movementEngine);
         this.vfxEngine = new VFXEngine(this.layerManager);
