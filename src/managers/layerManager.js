@@ -35,4 +35,12 @@ export class LayerManager {
             }
         }
     }
+
+    getLayer(key) {
+        const canvas = this.layers[key];
+        return {
+            canvas,
+            getContext: () => this.contexts[key]
+        };
+    }
 }
