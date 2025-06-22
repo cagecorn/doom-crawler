@@ -27,6 +27,8 @@ import { NarrativeManager } from './managers/narrativeManager.js';
 import { TurnManager } from './managers/turnManager.js';
 import { TurnEngine } from './engines/turnEngine.js';
 import { VFXEngine } from './engines/vfxEngine.js';
+import { SpriteEngine } from './engines/spriteEngine.js';
+import { StatEngine } from './engines/statEngine.js';
 import { SKILLS } from './data/skills.js';
 import { EFFECTS } from './data/effects.js';
 import { Item } from './entities.js';
@@ -182,6 +184,10 @@ export class Game {
         this.engineBridge.register('movement', this.movementEngine);
         this.vfxEngine = new VFXEngine(this.layerManager);
         this.engineBridge.register('vfx', this.vfxEngine);
+        this.spriteEngine = new SpriteEngine(this.layerManager);
+        this.engineBridge.register('sprite', this.spriteEngine);
+        this.statEngine = new StatEngine();
+        this.engineBridge.register('stat', this.statEngine);
         this.fogManager = new FogManager(this.mapManager.width, this.mapManager.height);
         this.particleDecoratorManager = new Managers.ParticleDecoratorManager();
         this.particleDecoratorManager.setManagers(this.vfxManager, this.mapManager);
@@ -1093,9 +1099,6 @@ export class Game {
     update = (deltaTime) => {
         if (this.gameState.isGameOver) return;
 
-        // ✅ 모든 엔진을 업데이트하는 브릿지 호출
-        this.engineBridge.update(this.getContext());
-
         const { gameState, mercenaryManager, monsterManager, itemManager, mapManager, inputHandler, effectManager, aiEngine, eventManager, equipmentManager, pathfindingManager, microEngine, microItemAIManager } = this;
         if (gameState.isPaused) return;
 
@@ -1216,6 +1219,8 @@ export class Game {
             ...this.monsterManager.monsters.flatMap(m => m.consumables || []),
         ];
         this.microEngine.update(allItems);
+        // ✅ 모든 엔진을 업데이트하는 브릿지 호출 (렌더링 포함)
+        this.engineBridge.update(this.getContext());
         eventManager.publish('debug', { tag: 'Frame', message: '--- Frame Update End ---' });
     }
 
@@ -1248,18 +1253,11 @@ export class Game {
         const contexts = layerManager.contexts;
 
         mapManager.render(contexts.mapBase, contexts.mapDecor, assets);
-        itemManager.render(contexts.mapDecor);
 
         // buffManager.renderGroundAuras(contexts.groundFx, ...); // (미래 구멍)
 
-        monsterManager.monsters.filter(m => !m.isHidden).forEach(m => m.render(contexts.entity));
-        mercenaryManager.mercenaries.filter(m => !m.isHidden).forEach(m => m.render(contexts.entity));
-        this.petManager.pets.filter(p => !p.isHidden).forEach(p => p.render(contexts.entity));
-        if (!gameState.player.isHidden) gameState.player.render(contexts.entity);
-
         fogManager.render(contexts.vfx, mapManager.tileSize);
         uiManager.renderHpBars(contexts.vfx, gameState.player, monsterManager.monsters, mercenaryManager.mercenaries);
-        this.projectileManager.render(contexts.vfx);
         // this.vfxManager.render(contexts.vfx);
         this.speechBubbleManager.render(contexts.vfx);
         this.effectIconManager.render(contexts.vfx, [gameState.player, ...monsterManager.monsters, ...mercenaryManager.mercenaries, ...this.petManager.pets], EFFECTS);
@@ -1289,6 +1287,7 @@ export class Game {
             equipmentManager: this.equipmentManager,
             vfxManager: this.vfxEngine,
             turnManager: this.turnEngine,
+            statManager: this.statEngine,
             camera: this.gameState.camera,
             assets: this.loader.assets,
             metaAIManager: aiEngine,
@@ -1297,6 +1296,7 @@ export class Game {
             playerGroup: this.playerGroup,
             monsterGroup: this.monsterGroup,
             speechBubbleManager: this.speechBubbleManager,
+            petManager: this.petManager,
             enemies: aiEngine.groups['dungeon_monsters']?.members || []
         };
     }
