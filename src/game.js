@@ -13,7 +13,10 @@ import { AquariumMapManager } from './aquariumMap.js';
 import { AquariumManager, AquariumInspector } from './managers/aquariumManager.js';
 import * as Managers from './managers/index.js'; // managers/index.js에서 모든 매니저를 한 번에 불러옴
 import { AssetLoader } from './assetLoader.js';
-import { MetaAIManager, STRATEGY } from './managers/ai-managers.js';
+import { STRATEGY } from './managers/ai-managers.js';
+import { MetaAIManager } from './managers/metaAIManager.js';
+import { AIEngine } from './engines/aiEngine.js';
+import { MBTIEngine } from './engines/mbtiEngine.js';
 import { SaveLoadManager } from './managers/saveLoadManager.js';
 import { LayerManager } from './managers/layerManager.js';
 import { PathfindingManager } from './managers/pathfindingManager.js';
@@ -160,9 +163,11 @@ export class Game {
         this.speechBubbleManager = this.managers.SpeechBubbleManager;
         this.equipmentRenderManager = this.managers.EquipmentRenderManager;
         this.mercenaryManager.equipmentRenderManager = this.equipmentRenderManager;
-        this.traitManager = this.managers.TraitManager;
-        this.mercenaryManager.setTraitManager(this.traitManager);
-        this.monsterManager.setTraitManager(this.traitManager);
+        // this.traitManager = this.managers.TraitManager;
+        this.mbtiEngine = new MBTIEngine(this.eventManager, this.uiManager);
+        this.engineBridge.register('mbti', this.mbtiEngine);
+        this.mercenaryManager.setTraitManager(this.mbtiEngine);
+        this.monsterManager.setTraitManager(this.mbtiEngine);
         this.parasiteManager = this.managers.ParasiteManager;
 
         // 매니저 간 의존성 연결
@@ -186,7 +191,9 @@ export class Game {
         this.uiManager.mercenaryManager = this.mercenaryManager;
         this.uiManager.particleDecoratorManager = this.particleDecoratorManager;
         this.uiManager.vfxManager = this.vfxManager;
-        this.metaAIManager = new MetaAIManager(this.eventManager);
+        // this.metaAIManager = new MetaAIManager(this.eventManager);
+        this.aiEngine = new AIEngine();
+        this.engineBridge.register('ai', this.aiEngine);
         this.possessionAIManager = new PossessionAIManager(this.eventManager);
         this.itemFactory.emblems = EMBLEMS;
 
@@ -202,9 +209,9 @@ export class Game {
             const randomType = ghostTypes[Math.floor(Math.random() * ghostTypes.length)];
             this.possessionAIManager.addGhost(new Ghost(randomType, ghostAIs[randomType]));
         }
-        this.petManager = new Managers.PetManager(this.eventManager, this.factory, this.metaAIManager, this.auraManager, this.vfxManager);
+        this.petManager = new Managers.PetManager(this.eventManager, this.factory, this.aiEngine, this.auraManager, this.vfxManager);
         this.managers.PetManager = this.petManager;
-        this.skillManager.setManagers(this.effectManager, this.factory, this.metaAIManager, this.monsterManager);
+        this.skillManager.setManagers(this.effectManager, this.factory, this.aiEngine, this.monsterManager);
         this.aquariumManager = new AquariumManager(
             this.eventManager,
             this.monsterManager,
@@ -213,7 +220,7 @@ export class Game {
             this.factory,
             this.itemFactory,
             this.vfxManager,
-            this.traitManager
+            this.mbtiEngine
         );
         this.aquariumInspector = new AquariumInspector(this.aquariumManager);
 
@@ -255,9 +262,9 @@ export class Game {
         });
         this.aquariumInspector.run();
 
-        this.playerGroup = this.metaAIManager.createGroup('player_party', STRATEGY.AGGRESSIVE);
+        this.playerGroup = this.aiEngine.createGroup('player_party', STRATEGY.AGGRESSIVE);
         // 플레이어는 직접 조종하므로 AI를 비활성화하지만 용병은 계속 행동하게 둡니다.
-        this.monsterGroup = this.metaAIManager.createGroup('dungeon_monsters', STRATEGY.AGGRESSIVE);
+        this.monsterGroup = this.aiEngine.createGroup('dungeon_monsters', STRATEGY.AGGRESSIVE);
 
         // === 2. 플레이어 생성 ===
         const startPos = this.mapManager.getRandomFloorPosition() || { x: this.mapManager.tileSize, y: this.mapManager.tileSize };
@@ -575,7 +582,7 @@ export class Game {
     }
 
     setupEventListeners(assets, canvas) {
-        const { eventManager, combatCalculator, monsterManager, mercenaryManager, mapManager, metaAIManager, pathfindingManager } = this;
+        const { eventManager, combatCalculator, monsterManager, mercenaryManager, mapManager, pathfindingManager } = this;
         const gameState = this.gameState;
 
         // 공격 이벤트 처리
@@ -836,7 +843,7 @@ export class Game {
                 const particleColor = isGuardian ? 'rgba(50, 150, 255, 0.8)' : 'rgba(255, 100, 50, 0.8)';
                 const imgKey = isGuardian ? 'guardian-hymn-effect' : 'courage-hymn-effect';
 
-                const group = this.metaAIManager.groups[caster.groupId];
+                const group = this.aiEngine.groups[caster.groupId];
                 const allies = group ? group.members : [caster];
 
                 allies.forEach(ally => {
@@ -1089,7 +1096,7 @@ export class Game {
         // ✅ 모든 엔진을 업데이트하는 브릿지 호출
         this.engineBridge.update(this.getContext());
 
-        const { gameState, mercenaryManager, monsterManager, itemManager, mapManager, inputHandler, effectManager, metaAIManager, eventManager, equipmentManager, pathfindingManager, microEngine, microItemAIManager } = this;
+        const { gameState, mercenaryManager, monsterManager, itemManager, mapManager, inputHandler, effectManager, aiEngine, eventManager, equipmentManager, pathfindingManager, microEngine, microItemAIManager } = this;
         if (gameState.isPaused) return;
 
         const allEntities = [gameState.player, ...mercenaryManager.mercenaries, ...monsterManager.monsters, ...(this.petManager?.pets || [])];
@@ -1186,15 +1193,16 @@ export class Game {
             turnManager: this.turnEngine,
             camera: gameState.camera,
             assets: this.loader.assets,
-            metaAIManager,
+            metaAIManager: aiEngine,
+            traitManager: this.mbtiEngine,
             microItemAIManager,
             playerGroup: this.playerGroup,
             monsterGroup: this.monsterGroup,
             speechBubbleManager: this.speechBubbleManager,
-            enemies: metaAIManager.groups['dungeon_monsters']?.members || []
+            enemies: aiEngine.groups['dungeon_monsters']?.members || []
         };
         // 등록된 엔진들 업데이트는 상단에서 처리
-        metaAIManager.update(context);
+        // this.metaAIManager.update(context);
         this.possessionAIManager.update(context);
         this.itemAIManager.update(context);
         this.projectileManager.update(allEntities);
@@ -1266,7 +1274,7 @@ export class Game {
     }
 
     getContext() {
-        const { gameState, metaAIManager } = this;
+        const { gameState, aiEngine } = this;
         return {
             eventManager: this.eventManager,
             player: gameState.player,
@@ -1283,12 +1291,13 @@ export class Game {
             turnManager: this.turnEngine,
             camera: this.gameState.camera,
             assets: this.loader.assets,
-            metaAIManager,
+            metaAIManager: aiEngine,
+            traitManager: this.mbtiEngine,
             microItemAIManager: this.microItemAIManager,
             playerGroup: this.playerGroup,
             monsterGroup: this.monsterGroup,
             speechBubbleManager: this.speechBubbleManager,
-            enemies: metaAIManager.groups['dungeon_monsters']?.members || []
+            enemies: aiEngine.groups['dungeon_monsters']?.members || []
         };
     }
 
